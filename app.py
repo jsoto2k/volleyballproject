@@ -44,3 +44,30 @@ def upload_file():
 if  __name__ == '__main__':
     app.run(debug=True)
     
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///volleyball.db'
+db = SQLAlchemy(app)
+
+class Player(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    position = db.Column(db.String(80), nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+    year = db.Column(db.String(80), nullable = False)
+                    
+class Team(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    coach = db.Column(db.String(80), nullable=False)
+    location = db.Column(db.String(80), nullable=False)
+    players = db.relationship('Player', backref='team', lazy=True)
+    
+class Match(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String(80), nullable=False)
+    location = db.Column(db.String(80), nullable=False)
+    home_team = db.Column(db.String(80), nullable=False)
+    away_team = db.Column(db.String(80), nullable=False)
+    result = db.Column(db.String(80), nullable=False)
+
+db.create_all()
+ 
