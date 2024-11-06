@@ -12,14 +12,42 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Allowed file extensions for upload to site 
 ALLOWED_EXTENSIONS = {'dvw'}
 
+# Database Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///volleyball.db'
+db = SQLAlchemy(app)
+
+# Database Tables
+# Stores information on each player uploaded from the team roster 
+class Player(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    position = db.Column(db.String(80), nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+
+# Stores information on each team uploaded to the database
+class Team(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    players = db.relationship('Player', backref='team', lazy=True)
+
+# Stores information on each match uploaded to the database
+class Match(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    home_team = db.Column(db.String(80), nullable=False)
+    away_team = db.Column(db.String(80), nullable=False)
+    result = db.Column(db.String(80), nullable=False)
+
+
 # Function to check for valid file extension 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Route for the apps home page 
 @app.route('/')
 def home():
     return render_template('upload.html')
 
+# Route to upload a file to the site 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Check if the post request has the file part
@@ -41,33 +69,10 @@ def upload_file():
     
     return 'Invalid file type'
 
-if  __name__ == '__main__':
+
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all() 
     app.run(debug=True)
-    
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///volleyball.db'
-db = SQLAlchemy(app)
 
-class Player(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    position = db.Column(db.String(80), nullable=False)
-    number = db.Column(db.Integer, nullable=False)
-    year = db.Column(db.String(80), nullable = False)
-                    
-class Team(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    coach = db.Column(db.String(80), nullable=False)
-    location = db.Column(db.String(80), nullable=False)
-    players = db.relationship('Player', backref='team', lazy=True)
-    
-class Match(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.String(80), nullable=False)
-    location = db.Column(db.String(80), nullable=False)
-    home_team = db.Column(db.String(80), nullable=False)
-    away_team = db.Column(db.String(80), nullable=False)
-    result = db.Column(db.String(80), nullable=False)
-
-db.create_all()
  
