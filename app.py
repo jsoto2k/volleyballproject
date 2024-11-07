@@ -38,6 +38,61 @@ class Match(db.Model):
     result = db.Column(db.String(80), nullable=False)
 
 
+def parse_dvw_file(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    # Initialize variables to store extracted data
+    home_team = ""
+    away_team = ""
+    #match_result = "Unknown"  
+    home_players = []
+    away_players = []
+
+    # Parsing flags
+    in_teams_section = False
+    in_home_players_section = False
+    in_away_players_section = False
+
+    for line in lines:
+        #Teams section within DVW File 
+        if "[3TEAMS]" in line:
+            in_teams_section = True
+            continue
+        # Home Team Section within DVW File
+        if "[3PLAYERS-H]" in line:
+            in_teams_section = False
+            in_home_players_section = True
+            continue
+        # Away Team Section within DVW File
+        if "[3PLAYERS-V]" in line:
+            in_home_players_section = False
+            in_away_players_section = True
+            continue
+        # When in Teams Section, extract team names for home and away teams 
+        if in_teams_section:
+            team_info = line.split(';')
+            if not home_team:
+                home_team = team_info[1]
+            else:
+                away_team = team_info[1]
+                
+        # When in Home or Away Teams Section, extract player information
+        if in_home_players_section or in_away_players_section:
+            player_info = line.split(';')
+            player = {
+                'number': int(player_info[1]),
+                'name': player_info[5],
+                'position': player_info[4] if player_info[4] else "Unknown"
+            }
+            if in_home_players_section:
+                home_players.append(player)
+            elif in_away_players_section:
+                away_players.append(player)
+
+    return home_team, away_team, home_players, away_players
+
+
 # Function to check for valid file extension 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
