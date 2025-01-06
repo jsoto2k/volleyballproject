@@ -33,6 +33,7 @@ class Team(db.Model):
 # Stores information on each match uploaded to the database
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String(80), nullable=False)
     home_team = db.Column(db.String(80), nullable=False)
     away_team = db.Column(db.String(80), nullable=False)
     result = db.Column(db.String(80), nullable=False)
@@ -55,35 +56,46 @@ def parse_dvw_file(file_path):
     in_away_players_section = False
 
     for line in lines:
-        #Teams section within DVW File 
-        if "[3TEAMS]" in line:
-            in_teams_section = True
-            continue
-        # Home Team Section within DVW File
-        if "[3PLAYERS-H]" in line:
+        # Check if the line indicates the start of a new section
+        if line.startswith("[3"):
+            # Turn off all section flags when a new section starts
+            in_match_section = False
             in_teams_section = False
-            in_home_players_section = True
-            continue
-        # Away Team Section within DVW File
-        if "[3PLAYERS-V]" in line:
             in_home_players_section = False
-            in_away_players_section = True
+            in_away_players_section = False
+
+            # Turn on the appropriate flag based on the section header
+            if "[3MATCH]" in line:
+                in_match_section = True
+            elif "[3TEAMS]" in line:
+                in_teams_section = True
+            elif "[3PLAYERS-H]" in line:
+                in_home_players_section = True
+            elif "[3PLAYERS-V]" in line:
+                in_away_players_section = True
             continue
+
         # When in Teams Section, extract team names for home and away teams 
         if in_teams_section:
             team_info = line.split(';')
+            print("Current line:", line)  # Print the current line being processed
+            print("team_info:", team_info)  # Print the result of splitting the line
             if not home_team:
                 home_team = team_info[1]
+                print("Setting home_team:", home_team, "from line:", line)
             else:
                 away_team = team_info[1]
+                print("Setting away_team:", away_team, "from line:", line)
                 
         # When in Home or Away Teams Section, extract player information
         if in_home_players_section or in_away_players_section:
             player_info = line.split(';')
+            print("Current line:", line)  # Print the current line being processed
+            print("team_info:", team_info)  # Print the result of splitting the line
             player = {
                 'number': int(player_info[1]),
                 'name': player_info[5],
-                'position': player_info[4] if player_info[4] else "Unknown"
+               # 'position': player_info[4] if player_info[4] else "Unknown"
             }
             if in_home_players_section:
                 home_players.append(player)
@@ -120,7 +132,34 @@ def upload_file():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(file_path)
         
-        return 'File uploaded successfully'
+        # Parse the dvw file to get match and player information
+        home_team, away_team, home_players, away_players = parse_dvw_file(file_path) 
+        print (home_team, away_team, home_players, away_players)
+
+        # # Store the teams in the database
+        # home_team_entry = Team(name=home_team)
+        # away_team_entry = Team(name=away_team)
+        # db.session.add(home_team_entry)
+        # db.session.add(away_team_entry)
+        # db.session.commit()
+
+        # # Store the players in the database
+        # for player in home_players:
+        #     player_entry = Player(name=player['name'], position=player['position'], number=player['number'], team_id=home_team_entry.id)
+        #     db.session.add(player_entry)
+
+        # for player in away_players:
+        #     player_entry = Player(name=player['name'], position=player['position'], number=player['number'], team_id=away_team_entry.id)
+        #     db.session.add(player_entry)
+
+        # db.session.commit()
+
+        # # Store the match in the database (result is "Unknown" for now)
+        # match_entry = Match(home_team=home_team, away_team=away_team, result="Unknown")
+        # db.session.add(match_entry)
+        # db.session.commit()
+
+        return 'File uploaded and data added to the database successfully'
     
     return 'Invalid file type'
 
