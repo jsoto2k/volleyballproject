@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
 import matplotlib.pyplot as plt
@@ -139,15 +139,16 @@ def parse_all_dvw_files():
             db.session.add(created_play)
             db.session.commit()
     
-def get_heatmap_data(team_id, skill=None, player_name=None):
+def get_heatmap_data(team_id, skill=None, player_ids=None):
     query = Play.query.filter_by(team_id=team_id)
     if skill:
         query = query.filter_by(skill=skill)
-    if player_name:
-        player = Player.query.filter_by(name=player_name, team_id=team_id).first()
-        if player:
-            query = query.filter_by(player_id=player.id)
+    if player_ids:
+        # Ensure player_ids is a list of integers
+        player_ids = [int(pid) for pid in player_ids]
+        query = query.filter(Play.player_id.in_(player_ids))
     return query.all()
+
 
 def generate_attack_heatmap(data, title):
     # Ensure the coordinates are numeric
@@ -216,9 +217,9 @@ def heatmaps():
 def generate_heatmap():
     team_id = request.form.get('team_id')
     skill_filter = request.form.get('skill')
-    player_name = request.form.get('player_name')
+    player_ids = request.form.get('player_ids')
 
-    plays = get_heatmap_data(team_id, skill_filter, player_name)
+    plays = get_heatmap_data(team_id, skill_filter, player_ids)
 
     # Extract coordinates for heatmap
     data = pd.DataFrame([{
@@ -232,6 +233,10 @@ def generate_heatmap():
     heatmap_path = generate_attack_heatmap(data, f"Heatmap for Team {team_id}")
     return render_template('heatmap_result.html', image_url=heatmap_path)
 
+@app.route('/players/<int:team_id>')
+def get_players_by_team(team_id):
+    players = Player.query.filter_by(team_id=team_id).all()
+    return jsonify([{'id': player.id, 'name': player.name} for player in players])
     
 @app.route('/view_teams')
 def view_teams():

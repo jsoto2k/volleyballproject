@@ -6,11 +6,20 @@
     <form action="/generate_heatmap" method="post">
         <div class="mb-3">
             <label for="team_id" class="form-label">Select Team:</label>
-            <select name="team_id" id="team_id" class="form-select">
+            <select name="team_id" id="team_id" class="form-select" required>
+                <option value="" disabled selected>Select a team</option>
                 {% for team in teams %}
                     <option value="{{ team.id }}">{{ team.name }}</option>
                 {% endfor %}
             </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="players" class="form-label">Select Players:</label>
+            <select name="player_ids" id="players" class="form-select" multiple disabled>
+                <!-- Players will be dynamically loaded here -->
+            </select>
+            <small class="form-text text-muted">Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple players.</small>
         </div>
 
         <div class="mb-3">
@@ -23,12 +32,40 @@
             </select>
         </div>
 
-        <div class="mb-3">
-            <label for="player_name" class="form-label">Filter by Player Name:</label>
-            <input type="text" name="player_name" id="player_name" class="form-control" placeholder="Enter player name">
-        </div>
-
         <button type="submit" class="btn btn-primary">Generate Heatmap</button>
     </form>
 </div>
+
+<script>
+    document.getElementById('team_id').addEventListener('change', function () {
+        const teamId = this.value;
+        const playerSelect = document.getElementById('players');
+        playerSelect.innerHTML = ''; // Clear previous options
+        playerSelect.disabled = true;
+
+        if (teamId) {
+            fetch(`/players/${teamId}`)
+                .then(response => response.json())
+                .then(players => {
+                    if (players.length > 0) {
+                        players.forEach(player => {
+                            const option = document.createElement('option');
+                            option.value = player.id;
+                            option.textContent = player.name;
+                            playerSelect.appendChild(option);
+                        });
+                        playerSelect.disabled = false; // Enable the player select box
+                    } else {
+                        const noPlayersOption = document.createElement('option');
+                        noPlayersOption.textContent = 'No players available';
+                        noPlayersOption.disabled = true;
+                        playerSelect.appendChild(noPlayersOption);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching players:', error);
+                });
+        }
+    });
+</script>
 {% endblock %}
