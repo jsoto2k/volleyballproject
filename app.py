@@ -145,44 +145,47 @@ def upload_file():
     file = request.files['file']
     
     # If user does not select file, browser also submits an empty part without filename 
-    if file.filename == '':
-        return 'No selected file'
+    if file.filename == '' or not allowed_file(file.filename):
+        return 'invalid file'
+    
     
     # If file is allowed, save it to the upload folder
-    if file and allowed_file(file.filename):
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(file_path)
-        
-        # Parse the dvw file to get match and player information
-        home_team, away_team, home_players, away_players = parse_dvw_file(file_path) 
-        print (home_team, away_team, home_players, away_players)
-
-        # # Store the teams in the database
-        # home_team_entry = Team(name=home_team)
-        # away_team_entry = Team(name=away_team)
-        # db.session.add(home_team_entry)
-        # db.session.add(away_team_entry)
-        # db.session.commit()
-
-        # # Store the players in the database
-        # for player in home_players:
-        #     player_entry = Player(name=player['name'], position=player['position'], number=player['number'], team_id=home_team_entry.id)
-        #     db.session.add(player_entry)
-
-        # for player in away_players:
-        #     player_entry = Player(name=player['name'], position=player['position'], number=player['number'], team_id=away_team_entry.id)
-        #     db.session.add(player_entry)
-
-        # db.session.commit()
-
-        # # Store the match in the database (result is "Unknown" for now)
-        # match_entry = Match(home_team=home_team, away_team=away_team, result="Unknown")
-        # db.session.add(match_entry)
-        # db.session.commit()
-
-        return 'File uploaded and data added to the database successfully'
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(file_path)
     
-    return 'Invalid file type'
+    # Parse the dvw file to get match and player information
+    parse_all_dvw_files()
+    
+    return redirect(url_for('heatmaps'))
+
+@app.route('/heatmaps')
+def heatmaps():
+    teams = Team.query.all()
+    return render_template('heatmaps.html', teams=teams)
+
+@app.route('/generate_heatmap', methods=['POST'])
+def generate_heatmap():
+    team__id = request.form.get('team_id')
+    skill_filter = request.form.get('skill')
+    player_name = request.form.get('player_name')
+    
+    team = Team.query.get(team__id)
+    combined_df = parse_all_dvw_files()
+
+    filtered_data = combined_df[combined_df['team'] == team.name]
+    if skill_filter:
+        filtered_data = filtered_data[filtered_data['skill'] == skill_filter]
+    if player_name:
+        filtered_data = filtered_data[filtered_data['player_name'] == player_name]
+
+    coordinates = filtered_data[['end_coordinate_x', 'end_coordinate_y']]
+    heatmap_path = generate_attack_heatmap(coordinates, f"{team.name} Heatmap")
+    return render_template('heatmap_result.html', image_url=heatmap_path)
+    
+@app.route('/view_teams')
+def view_teams():
+    teams = Team.query.all()
+    return render_template('view_teams.html', teams=teams)
 
 
 if __name__ == '__main__':
