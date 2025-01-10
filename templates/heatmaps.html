@@ -1,43 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heatmaps</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center">Heatmaps</h1>
-        <form action="/generate_heatmap" method="POST">
-            <div class="mb-3">
-                <label for="team_id" class="form-label">Select Team:</label>
-                <select name="team_id" id="team_id" class="form-select" required>
-                    {% for team in teams %}
-                        <option value="{{ team.id }}">{{ team.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+{% extends 'base.html' %}
 
-            <div class="mb-3">
-                <label for="skill" class="form-label">Filter by Skill:</label>
-                <select name="skill" id="skill" class="form-select">
-                    <option value="">All</option>
-                    <option value="Attack">Attack</option>
-                    <option value="Serve">Serve</option>
-                    <option value="Block">Block</option>
-                </select>
-            </div>
+{% block content %}
+<div class="container mt-5">
+    <h1>Heatmaps</h1>
+    <form action="/generate_heatmap" method="post">
+        <div class="mb-3">
+            <label for="team_id" class="form-label">Select Team:</label>
+            <select name="team_id" id="team_id" class="form-select">
+                {% for team in teams %}
+                    <option value="{{ team.id }}">{{ team.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <div class="mb-3">
-                <label for="player_name" class="form-label">Filter by Player Name:</label>
-                <input type="text" name="player_name" id="player_name" class="form-control" placeholder="Enter player name">
-            </div>
+        <div class="mb-3">
+            <label for="skill" class="form-label">Filter by Skill:</label>
+            <select name="skill" id="skill" class="form-select">
+                <option value="">All</option>
+                <option value="Attack">Attack</option>
+                <option value="Serve">Serve</option>
+                <option value="Block">Block</option>
+            </select>
+        </div>
 
-            <button type="submit" class="btn btn-primary">Generate Heatmap</button>
-        </form>
-    </div>
+        <div class="mb-3">
+            <label for="player_name" class="form-label">Filter by Player Name:</label>
+            <input type="text" name="player_name" id="player_name" class="form-control" placeholder="Enter player name">
+        </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+        <button type="submit" class="btn btn-primary">Generate Heatmap</button>
+    </form>
+</div>
+{% endblock %}
