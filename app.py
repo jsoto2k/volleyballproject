@@ -184,7 +184,7 @@ def generate_attack_heatmap(data, title, filename):
     heatmap_path = os.path.join(static_dir, filename)
     plt.savefig(heatmap_path)
     plt.close()
-    return heatmap_path
+    return f'static/{filename}'
 
 
 # Route for the apps home page 
