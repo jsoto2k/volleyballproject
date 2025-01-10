@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns 
 import numpy as np 
 from datavolley import read_dv, pycourt, helpers
+import webbrowser
 
 app = Flask(__name__)
 
@@ -60,6 +61,12 @@ class Play(db.Model):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'dvw'
 
+def is_valid_play(play):
+    required_keys = ['player_name', 'attack_code', 'start_coordinate_x', 'end_coordinate_x']
+    for key in required_keys:
+        if key not in play or pd.isnull(play[key]):
+            return False
+    return True
 
 def parse_all_dvw_files():
     file_list = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith('.dvw')]
@@ -104,14 +111,19 @@ def parse_all_dvw_files():
     # Add players 
         for _, play in plays.iterrows():
             player_name = play['player_name']
-            if not player_name or not isinstance(player_name, str) or not isinstance(play['attack_code'], str) or np.isnan(play['start_coordinate_x']):
+            #Check if the play contains all necessary data
+            if not is_valid_play(play):
                 continue
+            
+            # add player to the database
             team_id = home_team.id if play['team'] == home_team.name else visiting_team.id
             player = Player.query.filter_by(name=player_name, team_id=team_id).first()
             if not player: 
                 player = Player(name=player_name, team_id=team_id)
                 db.session.add(player)
                 db.session.commit()
+            
+            # add plays to the datagbase
             created_play = Play (
                 match_id=match.id,
                 team_id=team_id,
@@ -127,23 +139,44 @@ def parse_all_dvw_files():
             db.session.add(created_play)
             db.session.commit()
     
+def get_heatmap_data(team_id, skill=None, player_name=None):
+    query = Play.query.filter_by(team_id=team_id)
+    if skill:
+        query = query.filter_by(skill=skill)
+    if player_name:
+        player = Player.query.filter_by(name=player_name, team_id=team_id).first()
+        if player:
+            query = query.filter_by(player_id=player.id)
+    return query.all()
+
 def generate_attack_heatmap(data, title):
+    # Ensure the coordinates are numeric
+    data['end_coordinate_x'] = pd.to_numeric(data['end_coordinate_x'], errors='coerce')
+    data['end_coordinate_y'] = pd.to_numeric(data['end_coordinate_y'], errors='coerce')
+
+    # Drop rows with missing or non-numeric coordinates
+    data = data.dropna(subset=['end_coordinate_x', 'end_coordinate_y'])
+
+    # Ensure static directory exists
+    static_dir = 'static'
+    os.makedirs(static_dir, exist_ok=True)
+
+    # Generate heatmap
     fig, ax = plt.subplots()
     pycourt.pycourt(ax=ax)
     sns.kdeplot(
-        x=data['end_coordinate_x'], 
-        y=data['end_coordinate_y'], 
-        ax=ax, 
-        cmap="YlOrRd", 
-        fill=True, 
+        x=data['end_coordinate_x'],
+        y=data['end_coordinate_y'],
+        ax=ax,
+        cmap="YlOrRd",
+        fill=True,
         alpha=0.5
     )
     plt.title(title)
-    heatmap_path = os.path.join('static', f"{title.replace(' ', '_')}_heatmap.png")
+    heatmap_path = os.path.join(static_dir, f"{title.replace(' ', '_')}_heatmap.png")
     plt.savefig(heatmap_path)
     plt.close()
-    return heatmap_path   
-
+    return heatmap_path
 
 
 # Route for the apps home page 
@@ -181,22 +214,24 @@ def heatmaps():
 
 @app.route('/generate_heatmap', methods=['POST'])
 def generate_heatmap():
-    team__id = request.form.get('team_id')
+    team_id = request.form.get('team_id')
     skill_filter = request.form.get('skill')
     player_name = request.form.get('player_name')
-    
-    team = Team.query.get(team__id)
-    combined_df = parse_all_dvw_files()
 
-    filtered_data = combined_df[combined_df['team'] == team.name]
-    if skill_filter:
-        filtered_data = filtered_data[filtered_data['skill'] == skill_filter]
-    if player_name:
-        filtered_data = filtered_data[filtered_data['player_name'] == player_name]
+    plays = get_heatmap_data(team_id, skill_filter, player_name)
 
-    coordinates = filtered_data[['end_coordinate_x', 'end_coordinate_y']]
-    heatmap_path = generate_attack_heatmap(coordinates, f"{team.name} Heatmap")
+    # Extract coordinates for heatmap
+    data = pd.DataFrame([{
+        'end_coordinate_x': play.end_position_x,
+        'end_coordinate_y': play.end_position_y
+    } for play in plays])
+
+    if data.empty:
+        return "No data available for the selected filters.", 404
+
+    heatmap_path = generate_attack_heatmap(data, f"Heatmap for Team {team_id}")
     return render_template('heatmap_result.html', image_url=heatmap_path)
+
     
 @app.route('/view_teams')
 def view_teams():
@@ -207,6 +242,9 @@ def view_teams():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all() 
+    url = "http://127.0.0.1:5000"
+    webbrowser.open_new(url)
+    
     app.run(debug=True)
 
  
