@@ -2,6 +2,7 @@ import os
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+import matplotlib.pyplot as plt
 import pandas as pd 
 import seaborn as sns 
 import numpy as np 
@@ -126,7 +127,22 @@ def parse_all_dvw_files():
             db.session.add(created_play)
             db.session.commit()
     
-    
+def generate_attack_heatmap(data, title):
+    fig, ax = plt.subplots()
+    pycourt.pycourt(ax=ax)
+    sns.kdeplot(
+        x=data['end_coordinate_x'], 
+        y=data['end_coordinate_y'], 
+        ax=ax, 
+        cmap="YlOrRd", 
+        fill=True, 
+        alpha=0.5
+    )
+    plt.title(title)
+    heatmap_path = os.path.join('static', f"{title.replace(' ', '_')}_heatmap.png")
+    plt.savefig(heatmap_path)
+    plt.close()
+    return heatmap_path   
 
 
 
