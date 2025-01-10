@@ -1,6 +1,6 @@
 import os
-from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
 import matplotlib.pyplot as plt
 import pandas as pd 
@@ -106,7 +106,7 @@ def parse_all_dvw_files():
             player_name = play['player_name']
             if not player_name or not isinstance(player_name, str) or not isinstance(play['attack_code'], str) or np.isnan(play['start_coordinate_x']):
                 continue
-            team_id = home_team.id if play['team'] == 'home' else visiting_team.id
+            team_id = home_team.id if play['team'] == home_team.name else visiting_team.id
             player = Player.query.filter_by(name=player_name, team_id=team_id).first()
             if not player: 
                 player = Player(name=player_name, team_id=team_id)
