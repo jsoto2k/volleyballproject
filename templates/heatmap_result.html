@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Heatmap Result</h1>
+    <div class="text-center">
+        {% if image_url %}
+            <img src="{{ image_url }}" alt="Generated Heatmap" class="img-fluid">
+        {% else %}
+            <p>No heatmap available for the selected filters.</p>
+        {% endif %}
+    </div>
+    <div class="mt-3">
+        <a href="/heatmaps" class="btn btn-primary">Back to Heatmaps</a>
+    </div>
+</div>
+{% endblock %}
