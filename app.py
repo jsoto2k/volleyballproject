@@ -12,36 +12,52 @@ app = Flask(__name__)
 # Upload folder for site files 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Configuration for SQL Alchemy
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Allowed file extensions for upload to site 
-ALLOWED_EXTENSIONS = {'dvw'}
-
-# Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///volleyball.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 
 # Database Tables
-# Stores information on each player uploaded from the team roster 
-class Player(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    position = db.Column(db.String(80), nullable=False)
-    number = db.Column(db.Integer, nullable=False)
-
-# Stores information on each team uploaded to the database
+ # Stores information on each team uploaded to the database
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     players = db.relationship('Player', backref='team', lazy=True)
 
+# Stores information on each player uploaded from the team roster
+class Player(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+
 # Stores information on each match uploaded to the database
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    home_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    visiting_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     date = db.Column(db.String(80), nullable=False)
-    home_team = db.Column(db.String(80), nullable=False)
-    away_team = db.Column(db.String(80), nullable=False)
-    result = db.Column(db.String(80), nullable=False)
+
+# Store information on each play made during a match
+class Play(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    skill = db.Column(db.String(80), nullable=False)
+    attack_code = db.Column(db.String(80), nullable=False)
+    start_position_x = db.Column(db.String(80), nullable=False)
+    end_position_x = db.Column(db.String(80), nullable=False)
+    start_position_y = db.Column(db.String(80), nullable=False)
+    end_position_y = db.Column(db.String(80), nullable=False)
+    # point = db.Column(db.Boolean, nullable=False)
+    custom_code = db.Column(db.String(80), nullable=False)
+
+# Function to check if the file is a dvw file
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'dvw'
 
 
 def parse_dvw_file(file_path):
@@ -110,9 +126,7 @@ def parse_dvw_file(file_path):
     return home_team, away_team, home_players, away_players
 
 
-# Function to check for valid file extension 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 # Route for the apps home page 
 @app.route('/')
