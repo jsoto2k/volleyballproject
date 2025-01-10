@@ -2,22 +2,40 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h1>Teams</h1>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th scope="col">ID</th>
-                <th scope="col">Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for team in teams %}
-            <tr>
-                <td>{{ team.id }}</td>
-                <td>{{ team.name }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <h1>Teams Overview</h1>
+
+    {% for team in teams %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>{{ team.name }}</h3>
+            </div>
+            <div class="card-body">
+                <h5>Players:</h5>
+                {% if team.players %}
+                    <ul>
+                        {% for player in team.players %}
+                            <li>{{ player.name }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No players found for this team.</p>
+                {% endif %}
+
+                <h5>Matches:</h5>
+                {% set team_matches = matches | selectattr('home_team_id', 'equalto', team.id) | list %}
+                {% set team_matches = team_matches + (matches | selectattr('visiting_team_id', 'equalto', team.id) | list) %}
+
+                {% if team_matches %}
+                    <ul>
+                        {% for match in team_matches %}
+                            <li>{{ match.date }}: {{ match.home_team.name }} vs {{ match.visiting_team.name }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No matches found for this team.</p>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
 </div>
 {% endblock %}

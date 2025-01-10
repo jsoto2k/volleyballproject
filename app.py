@@ -44,6 +44,11 @@ class Match(db.Model):
     visiting_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     date = db.Column(db.String(80), nullable=False)
 
+    # Define relationships to Team
+    home_team = db.relationship('Team', foreign_keys=[home_team_id], backref='home_matches')
+    visiting_team = db.relationship('Team', foreign_keys=[visiting_team_id], backref='visiting_matches')
+
+
 # Store information on each play made during a match
 class Play(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -152,7 +157,7 @@ def get_heatmap_data(team_id, skill=None, player_ids=None):
     return query.all()
 
 
-def generate_attack_heatmap(data, title):
+def generate_attack_heatmap(data, title, filename):
     # Ensure the coordinates are numeric
     data['end_coordinate_x'] = pd.to_numeric(data['end_coordinate_x'], errors='coerce')
     data['end_coordinate_y'] = pd.to_numeric(data['end_coordinate_y'], errors='coerce')
@@ -176,7 +181,7 @@ def generate_attack_heatmap(data, title):
         alpha=0.5
     )
     plt.title(title)
-    heatmap_path = os.path.join(static_dir, f"{title.replace(' ', '_')}_heatmap.png")
+    heatmap_path = os.path.join(static_dir, filename)
     plt.savefig(heatmap_path)
     plt.close()
     return heatmap_path
@@ -220,11 +225,15 @@ def heatmaps():
 def generate_heatmap():
     team_id = request.form.get('team_id')
     skill_filter = request.form.get('skill')
-    player_ids = request.form.get('player_ids')
+    player_ids = request.form.getlist('player_ids')
+
+    team = Team.query.get(team_id)
+    player_names = [Player.query.get(pid).name for pid in player_ids]
+    players_string = ", ".join(player_names) if player_names else "All Players"
+
+    filename = f"{team.name}_{'_'.join(player_names) if player_names else 'AllPlayers'}_heatmap.png".replace(" ", "_")
 
     plays = get_heatmap_data(team_id, skill_filter, player_ids)
-
-    # Extract coordinates for heatmap
     data = pd.DataFrame([{
         'end_coordinate_x': play.end_position_x,
         'end_coordinate_y': play.end_position_y
@@ -233,7 +242,8 @@ def generate_heatmap():
     if data.empty:
         return "No data available for the selected filters.", 404
 
-    heatmap_path = generate_attack_heatmap(data, f"Heatmap for Team {team_id}")
+    heatmap_title = f"Heatmap for {team.name} - {players_string}"
+    heatmap_path = generate_attack_heatmap(data, heatmap_title, filename)
     return render_template('heatmap_result.html', image_url=heatmap_path)
 
 @app.route('/players/<int:team_id>')
@@ -244,7 +254,9 @@ def get_players_by_team(team_id):
 @app.route('/view_teams')
 def view_teams():
     teams = Team.query.all()
-    return render_template('view_teams.html', teams=teams)
+    matches = Match.query.all()
+    return render_template('view_teams.html', teams=teams, matches=matches)
+
 
 
 if __name__ == '__main__':
