@@ -60,71 +60,73 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'dvw'
 
 
-def parse_dvw_file(file_path):
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
+def parse_all_dvw_files():
+    file_list = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith('.dvw')]
+    
+    # Function to process individual files: This function will return the plays, home team, visiting team, and match date
+    def process_file(file_path):
+        dv_instance = read_dv.DataVolley(os.path.join(UPLOAD_FOLDER, file_path))
+        plays = dv_instance.get_plays()
+        home_team = plays.iloc[0]['home_team']
+        visiting_team = plays.iloc[0]['visiting_team']
+        
+        return plays, home_team, visiting_team, dv_instance.match_info['day'][0]
 
-    # Initialize variables to store extracted data
-    home_team = ""
-    away_team = ""
-    #match_result = "Unknown"  
-    home_players = []
-    away_players = []
-
-    # Parsing flags
-    in_teams_section = False
-    in_home_players_section = False
-    in_away_players_section = False
-
-    for line in lines:
-        # Check if the line indicates the start of a new section
-        if line.startswith("[3"):
-            # Turn off all section flags when a new section starts
-            in_match_section = False
-            in_teams_section = False
-            in_home_players_section = False
-            in_away_players_section = False
-
-            # Turn on the appropriate flag based on the section header
-            if "[3MATCH]" in line:
-                in_match_section = True
-            elif "[3TEAMS]" in line:
-                in_teams_section = True
-            elif "[3PLAYERS-H]" in line:
-                in_home_players_section = True
-            elif "[3PLAYERS-V]" in line:
-                in_away_players_section = True
+    # Loop through all the files in the upload folder and process them by assigning data to variables
+    for file_name in file_list: 
+        plays, home_team_name, visitng_team_name, match_date = process_file(file_name)
+        
+    # Adding data to the database 
+    
+        # Add home team info
+        home_team = Team.query.filter_by(name=home_team_name).first()
+        if not home_team :
+            home_team = Team(name=home_team_name)
+            db.session.add(home_team)
+            db.session.commit()
+        
+        # Add visiting team info
+        visiting_team = Team.query.filter_by(name=visitng_team_name).first()
+        if not visiting_team:
+            visiting_team = Team(name=visitng_team_name)
+            db.session.add(visiting_team)
+            db.session.commit()
+        
+        # Add match info
+        match = Match.query.filter_by(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date).first()
+        if match: 
             continue
-
-        # When in Teams Section, extract team names for home and away teams 
-        if in_teams_section:
-            team_info = line.split(';')
-            print("Current line:", line)  # Print the current line being processed
-            print("team_info:", team_info)  # Print the result of splitting the line
-            if not home_team:
-                home_team = team_info[1]
-                print("Setting home_team:", home_team, "from line:", line)
-            else:
-                away_team = team_info[1]
-                print("Setting away_team:", away_team, "from line:", line)
-                
-        # When in Home or Away Teams Section, extract player information
-        if in_home_players_section or in_away_players_section:
-            player_info = line.split(';')
-            print("Current line:", line)  # Print the current line being processed
-            print("team_info:", team_info)  # Print the result of splitting the line
-            player = {
-                'number': int(player_info[1]),
-                'name': player_info[5],
-               # 'position': player_info[4] if player_info[4] else "Unknown"
-            }
-            if in_home_players_section:
-                home_players.append(player)
-            elif in_away_players_section:
-                away_players.append(player)
-
-    return home_team, away_team, home_players, away_players
-
+        match = Match(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date)
+        db.session.add(match)
+        db.session.commit()
+        
+    # Add players 
+        for _, play in plays.iterrows():
+            player_name = play['player_name']
+            if not player_name or not isinstance(player_name, str) or not isinstance(play['attack_code'], str) or np.isnan(play['start_coordinate_x']):
+                continue
+            team_id = home_team.id if play['team'] == 'home' else visiting_team.id
+            player = Player.query.filter_by(name=player_name, team_id=team_id).first()
+            if not player: 
+                player = Player(name=player_name, team_id=team_id)
+                db.session.add(player)
+                db.session.commit()
+            created_play = Play (
+                match_id=match.id,
+                team_id=team_id,
+                player_id=player.id,
+                skill=play['skill'],
+                attack_code=play['attack_code'],
+                start_position_x=play['start_coordinate_x'],
+                end_position_x=play['end_coordinate_x'],
+                start_position_y=play['start_coordinate_y'],
+                end_position_y=play['end_coordinate_y'],
+                custom_code=play['custom_code']
+            )
+            db.session.add(created_play)
+            db.session.commit()
+    
+    
 
 
 
