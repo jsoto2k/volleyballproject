@@ -2,7 +2,9 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('Agg')  # Use non-interactive backend for server environments
 import pandas as pd 
 import seaborn as sns 
 import numpy as np 
@@ -185,27 +187,28 @@ def generate_attack_heatmap(data, title):
 def home():
     return render_template('upload.html')
 
-# Route to upload a file to the site 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Check if the post request has the file part
-    if 'file' not in request.files:
-        return 'No file part'
-    
-    file = request.files['file']
-    
-    # If user does not select file, browser also submits an empty part without filename 
-    if file.filename == '' or not allowed_file(file.filename):
-        return 'invalid file'
-    
-    
+    if 'files' not in request.files:
+        return 'No files part'
+
+    files = request.files.getlist('files')
+    # If user does not select file, browser warns user
+    if not files:
+        return 'No files selected'
+
+    # If file is not allowed or empty, browser warns user
+    for file in files:
+        if file.filename == '' or not allowed_file(file.filename):
+            continue
+   
     # If file is allowed, save it to the upload folder
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(file_path)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(file_path)
     
-    # Parse the dvw file to get match and player information
+    # Parse the dvw files to get match and player information
     parse_all_dvw_files()
-    
     return redirect(url_for('heatmaps'))
 
 @app.route('/heatmaps')

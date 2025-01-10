@@ -1,9 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>Upload a DVW File</h1>
+<div class="container mt-5">
+    <h1>Upload DVW Files</h1>
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".dvw">
-        <button type="submit" class="btn btn-primary">Upload</button>
+        <div class="mb-3">
+            <label for="files" class="form-label">Select Files:</label>
+            <input type="file" name="files" id="files" class="form-control" multiple required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload Files</button>
     </form>
+</div>
 {% endblock %}
