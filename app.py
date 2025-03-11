@@ -375,10 +375,14 @@ def delete_selected_files():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all() 
+        db.create_all()
+
     url = "http://127.0.0.1:5000"
-    webbrowser.open_new(url)
-    
+
+    # Only open the browser if this is the first process (not Flask's auto-reloader)
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        webbrowser.open_new(url)
+
     app.run(debug=True)
 
  
