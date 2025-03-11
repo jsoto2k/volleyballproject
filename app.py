@@ -47,6 +47,7 @@ class Match(db.Model):
     # Define relationships to Team
     home_team = db.relationship('Team', foreign_keys=[home_team_id], backref='home_matches')
     visiting_team = db.relationship('Team', foreign_keys=[visiting_team_id], backref='visiting_matches')
+    origin_file = db.Column(db.String(255), nullable=True)
 
 
 # Store information on each play made during a match
@@ -76,6 +77,8 @@ def is_valid_play(play):
     return True
 
 def parse_all_dvw_files():
+    problematic_files = []
+    successful_files = []
     file_list = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith('.dvw')]
     
     # Function to process individual files: This function will return the plays, home team, visiting team, and match date
@@ -89,62 +92,68 @@ def parse_all_dvw_files():
 
     # Loop through all the files in the upload folder and process them by assigning data to variables
     for file_name in file_list: 
-        plays, home_team_name, visitng_team_name, match_date = process_file(file_name)
-        
-    # Adding data to the database 
-    
-        # Add home team info
-        home_team = Team.query.filter_by(name=home_team_name).first()
-        if not home_team :
-            home_team = Team(name=home_team_name)
-            db.session.add(home_team)
-            db.session.commit()
-        
-        # Add visiting team info
-        visiting_team = Team.query.filter_by(name=visitng_team_name).first()
-        if not visiting_team:
-            visiting_team = Team(name=visitng_team_name)
-            db.session.add(visiting_team)
-            db.session.commit()
-        
-        # Add match info
-        match = Match.query.filter_by(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date).first()
-        if match: 
-            continue
-        match = Match(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date)
-        db.session.add(match)
-        db.session.commit()
-        
-    # Add players 
-        for _, play in plays.iterrows():
-            player_name = play['player_name']
-            #Check if the play contains all necessary data
-            if not is_valid_play(play):
-                continue
+        try: 
+            plays, home_team_name, visitng_team_name, match_date = process_file(file_name)
             
-            # add player to the database
-            team_id = home_team.id if play['team'] == home_team.name else visiting_team.id
-            player = Player.query.filter_by(name=player_name, team_id=team_id).first()
-            if not player: 
-                player = Player(name=player_name, team_id=team_id)
-                db.session.add(player)
+        # Adding data to the database 
+        
+            # Add home team info
+            home_team = Team.query.filter_by(name=home_team_name).first()
+            if not home_team :
+                home_team = Team(name=home_team_name)
+                db.session.add(home_team)
                 db.session.commit()
             
-            # add plays to the datagbase
-            created_play = Play (
-                match_id=match.id,
-                team_id=team_id,
-                player_id=player.id,
-                skill=play['skill'],
-                attack_code=play['attack_code'],
-                start_position_x=play['start_coordinate_x'],
-                end_position_x=play['end_coordinate_x'],
-                start_position_y=play['start_coordinate_y'],
-                end_position_y=play['end_coordinate_y'],
-                custom_code=play['custom_code']
-            )
-            db.session.add(created_play)
+            # Add visiting team info
+            visiting_team = Team.query.filter_by(name=visitng_team_name).first()
+            if not visiting_team:
+                visiting_team = Team(name=visitng_team_name)
+                db.session.add(visiting_team)
+                db.session.commit()
+            
+            # Add match info
+            match = Match.query.filter_by(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date).first()
+            if match: 
+                continue
+            match = Match(home_team_id=home_team.id, visiting_team_id=visiting_team.id, date=match_date, origin_file=file_name)
+            db.session.add(match)
             db.session.commit()
+            
+        # Add players 
+            for _, play in plays.iterrows():
+                player_name = play['player_name']
+                #Check if the play contains all necessary data
+                if not is_valid_play(play):
+                    continue
+                
+                # add player to the database
+                team_id = home_team.id if play['team'] == home_team.name else visiting_team.id
+                player = Player.query.filter_by(name=player_name, team_id=team_id).first()
+                if not player: 
+                    player = Player(name=player_name, team_id=team_id)
+                    db.session.add(player)
+                    db.session.commit()
+                
+                # add plays to the datagbase
+                created_play = Play (
+                    match_id=match.id,
+                    team_id=team_id,
+                    player_id=player.id,
+                    skill=play['skill'],
+                    attack_code=play['attack_code'],
+                    start_position_x=play['start_coordinate_x'],
+                    end_position_x=play['end_coordinate_x'],
+                    start_position_y=play['start_coordinate_y'],
+                    end_position_y=play['end_coordinate_y'],
+                    custom_code=play['custom_code']
+                )
+                db.session.add(created_play)
+                db.session.commit()
+        except Exception as e:
+            problematic_files.append(file_name)
+            print(f"Error processing file {file_name}: {e}")
+    return problematic_files
+                
     
 def get_heatmap_data(team_id, skill=None, player_ids=None):
     query = Play.query.filter_by(team_id=team_id)
@@ -213,8 +222,17 @@ def upload_file():
         file.save(file_path)
     
     # Parse the dvw files to get match and player information
-    parse_all_dvw_files()
-    return redirect(url_for('heatmaps'))
+    problematic = parse_all_dvw_files()
+
+    if problematic:
+        # If we have any bad files, show them on a special page
+        return render_template(
+            'process_result.html',
+            problematic_files=problematic
+        )
+    else:
+        # Otherwise, carry on as normal
+        return redirect(url_for('heatmaps'))
 
 @app.route('/heatmaps')
 def heatmaps():
@@ -256,6 +274,102 @@ def view_teams():
     teams = Team.query.all()
     matches = Match.query.all()
     return render_template('view_teams.html', teams=teams, matches=matches)
+
+@app.route('/delete_file/<filename>', methods=['POST'])
+def delete_file(filename):
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # 1) Find all matches that originated from this file
+    matches_from_file = Match.query.filter_by(origin_file=filename).all()
+    for match in matches_from_file:
+        # 2) Remove all plays belonging to this match
+        Play.query.filter_by(match_id=match.id).delete()
+        db.session.commit()
+
+        # 3) Remove the match itself
+        db.session.delete(match)
+        db.session.commit()
+    
+    all_teams = Team.query.all()
+    for team in all_teams:
+        # Check if team has any existing matches (home or visiting)
+        # or any players that appear in plays
+        match_exists = (Match.query.filter((Match.home_team_id==team.id) | 
+                                           (Match.visiting_team_id==team.id)).first())
+        if not match_exists:
+            # If no match references this team, check if it has any associated players left
+            db_players = Player.query.filter_by(team_id=team.id).all()
+
+            # if the team has no matches, remove the players
+            if db_players:
+                for p in db_players:
+                    db.session.delete(p)
+                db.session.commit()
+
+            # Remove the team
+            db.session.delete(team)
+            db.session.commit()  
+                  
+    # Re-parse to see if any more problematic files remain
+    problematic = parse_all_dvw_files()
+    if problematic:
+        return render_template(
+            'process_result.html',
+            problematic_files=problematic
+        )
+    else:
+        return redirect(url_for('heatmaps'))
+
+@app.route('/delete_all_files', methods=['POST'])
+def delete_all_files():
+    """
+    Delete all problematic files in one go.
+    """
+    # Get the comma-separated string of files from the hidden form field
+    problematic_str = request.form.get('problematic_files', '')
+    if not problematic_str:
+        # No files found, just redirect to parse again
+        return redirect(url_for('parse_all_dvw_files'))  # or wherever you'd like
+
+    files_to_delete = problematic_str.split(',')
+    for filename in files_to_delete:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    # After deleting them all, re-parse or do whichever flow you prefer
+    # Typically, we'd re-parse and either show if there's still more problematic
+    new_problem_files = parse_all_dvw_files()  
+    if new_problem_files:
+        return render_template('process_result.html', problematic_files=new_problem_files)
+    else:
+        return redirect(url_for('heatmaps'))
+
+@app.route('/manage_files')
+def manage_files():
+    # Gather all .dvw files in UPLOAD_FOLDER
+    file_list = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.endswith('.dvw')]
+    
+    return render_template('manage_files.html', files=file_list)
+
+@app.route('/delete_selected_files', methods=['POST'])
+def delete_selected_files():
+    # 'files_to_delete' is a list of checkboxes from manage_files.html
+    files_to_delete = request.form.getlist('files_to_delete')
+    if not files_to_delete:
+        # No files checked
+        return redirect(url_for('manage_files'))
+    
+    for file_name in files_to_delete:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    # After deleting selected files, redirect back to the manage files page
+    return redirect(url_for('manage_files'))
+
 
 
 

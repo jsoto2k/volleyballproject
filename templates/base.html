@@ -5,8 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
     <title>Volleyball App</title>
+    <style>
+        /* Make body fill the viewport and arrange content vertically */
+        body {
+          min-height: 100vh;          /* At least 100% of the window height */
+        }
+        /* Footer styling: 1-inch height, light background */
+        .footer {
+          height: 1in;
+          background-color: #f8f9fa;
+        }
+      </style>
 </head>
-<body>
+<body class="d-flex flex-column">
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">Volleyball App</a>
@@ -23,16 +34,27 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/view_teams">Teams</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/manage_files">Manage Files</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        {% block content %}
-        {% endblock %}
-    </div>
+    <main class="flex-fill">
+        <div class="container mt-4">
+          {% block content %}
+          {% endblock %}
+        </div>
+      </main>
+
+    <footer class="footer d-flex flex-column align-items-center justify-content-center">
+        <p class="m-0">2025 NNU Volleyball Heatmap App</p>
+        <small>by Julian Mikkelsen</small>
+    </footer>
+    
+    
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
 </body>
