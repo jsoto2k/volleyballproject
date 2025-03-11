@@ -19,6 +19,7 @@
 
         <!-- Delete ALL Problematic Files in one go -->
         <form action="/delete_all_files" method="post">
+            <input type="hidden" name="source" value="process_result">
             <!-- Put a comma-separated list of all files in a hidden input -->
             <input type="hidden" name="problematic_files" value="{{ problematic_files|join(',') }}">
             <button class="btn btn-danger">Delete All Problematic Files</button>

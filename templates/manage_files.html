@@ -6,11 +6,18 @@
     {% if files %}
         <!-- Single multi-delete form for all selected files -->
         <form method="POST" action="/delete_selected_files" class = "mb-5">
+            <input type="hidden" name="source" value="manage_files">
+            <div class="mb-2">
+                <!-- Select All Checkbox -->
+                <input type="checkbox" id="select-all" class="form-check-input">
+                <label for="select-all" class="form-check-label">Select All</label>
+            </div>
+
             <ul class="list-group mb-3">
                 {% for file in files %}
                 <li class="list-group-item d-flex align-items-center">
                     <!-- Multi-delete checkbox -->
-                    <input type="checkbox" name="files_to_delete" value="{{ file }}" style="margin-right: 0.5em;">
+                    <input type="checkbox" name="files_to_delete" value="{{ file }}" class="file-checkbox" style="margin-right: 0.5em;">
                     {{ file }}
                 </li>
                 {% endfor %}
@@ -21,4 +28,14 @@
         <p>No DVW files found in the uploads folder.</p>
     {% endif %}
 </div>
+
+<!-- JavaScript for Select All functionality -->
+<script>
+    document.getElementById("select-all").addEventListener("change", function() {
+        let checkboxes = document.querySelectorAll(".file-checkbox");
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+</script>
 {% endblock %}

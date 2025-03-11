@@ -278,8 +278,6 @@ def view_teams():
 @app.route('/delete_file/<filename>', methods=['POST'])
 def delete_file(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
 
     # 1) Find all matches that originated from this file
     matches_from_file = Match.query.filter_by(origin_file=filename).all()
@@ -291,36 +289,36 @@ def delete_file(filename):
         # 3) Remove the match itself
         db.session.delete(match)
         db.session.commit()
-    
+
+    # 4) Clean up orphaned players and teams
     all_teams = Team.query.all()
     for team in all_teams:
-        # Check if team has any existing matches (home or visiting)
-        # or any players that appear in plays
-        match_exists = (Match.query.filter((Match.home_team_id==team.id) | 
-                                           (Match.visiting_team_id==team.id)).first())
+        # Check if the team still has any associated matches
+        match_exists = Match.query.filter(
+            (Match.home_team_id == team.id) | (Match.visiting_team_id == team.id)
+        ).first()
+
         if not match_exists:
-            # If no match references this team, check if it has any associated players left
-            db_players = Player.query.filter_by(team_id=team.id).all()
+            # Remove all players from this team
+            Player.query.filter_by(team_id=team.id).delete()
+            db.session.commit()
 
-            # if the team has no matches, remove the players
-            if db_players:
-                for p in db_players:
-                    db.session.delete(p)
-                db.session.commit()
-
-            # Remove the team
+            # Remove the team itself
             db.session.delete(team)
-            db.session.commit()  
-                  
-    # Re-parse to see if any more problematic files remain
+            db.session.commit()
+
+    # 5) Finally, delete the file itself
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # Re-parse the remaining files to check for issues
     problematic = parse_all_dvw_files()
+    
     if problematic:
-        return render_template(
-            'process_result.html',
-            problematic_files=problematic
-        )
+        return render_template('process_result.html', problematic_files=problematic)
     else:
         return redirect(url_for('heatmaps'))
+
 
 @app.route('/delete_all_files', methods=['POST'])
 def delete_all_files():
@@ -356,19 +354,52 @@ def manage_files():
 
 @app.route('/delete_selected_files', methods=['POST'])
 def delete_selected_files():
-    # 'files_to_delete' is a list of checkboxes from manage_files.html
     files_to_delete = request.form.getlist('files_to_delete')
+
     if not files_to_delete:
-        # No files checked
         return redirect(url_for('manage_files'))
-    
-    for file_name in files_to_delete:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
+
+    for filename in files_to_delete:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # 1) Find all matches that originated from this file
+        matches_from_file = Match.query.filter_by(origin_file=filename).all()
+        for match in matches_from_file:
+            # 2) Remove all plays belonging to this match
+            Play.query.filter_by(match_id=match.id).delete()
+            db.session.commit()
+
+            # 3) Remove the match itself
+            db.session.delete(match)
+            db.session.commit()
+
+        # 4) Clean up orphaned players and teams
+        all_teams = Team.query.all()
+        for team in all_teams:
+            match_exists = Match.query.filter(
+                (Match.home_team_id == team.id) | (Match.visiting_team_id == team.id)
+            ).first()
+
+            if not match_exists:
+                # Remove all players from this team
+                Player.query.filter_by(team_id=team.id).delete()
+                db.session.commit()
+
+                # Remove the team itself
+                db.session.delete(team)
+                db.session.commit()
+
+        # 5) Finally, delete the file itself
         if os.path.exists(file_path):
             os.remove(file_path)
 
-    # After deleting selected files, redirect back to the manage files page
-    return redirect(url_for('manage_files'))
+    # After deleting, re-parse to check for problematic files
+    problematic = parse_all_dvw_files()
+
+    if problematic:
+        return render_template('process_result.html', problematic_files=problematic)
+    else:
+        return redirect(url_for('manage_files'))
 
 
 
