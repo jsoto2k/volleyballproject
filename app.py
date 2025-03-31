@@ -10,6 +10,9 @@ import seaborn as sns
 import numpy as np 
 from datavolley import read_dv, pycourt, helpers
 import webbrowser
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 app = Flask(__name__)
 
@@ -87,6 +90,8 @@ def parse_all_dvw_files():
         plays = dv_instance.get_plays()
         home_team = plays.iloc[0]['home_team']
         visiting_team = plays.iloc[0]['visiting_team']
+        
+
         
         return plays, home_team, visiting_team, dv_instance.match_info['day'][0]
 
